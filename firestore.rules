@@ -127,7 +127,7 @@ service cloud.firestore {
             'lock3Hint1Used','lock3Hint2Used',
             'lock4Hint1Used','lock4Hint2Used',
             'lock5Hint1Used','lock5Hint2Used',
-            'hintPenaltySeconds','lastUpdated'
+            'hintPenaltySeconds','lastUpdated','disqualified'
           ]) &&
           unchangedField('teamId') &&
           unchangedField('teamName') &&
@@ -137,6 +137,12 @@ service cloud.firestore {
           unchangedField('member3') &&
           unchangedField('registeredAt') &&
           isValidPenaltyChange() &&
+          // The anti-cheat lockdown self-reports a violation by writing
+          // disqualified: true from the participant's own browser (see
+          // src/hooks/useLockdown.js). Only false -> true is ever allowed
+          // here — reversing a disqualification stays an admin-only action
+          // (isAdmin() above bypasses this whole function).
+          isValidFlagFlip('disqualified') &&
           isValidFlagFlip('lock1Solved') &&
           isValidFlagFlip('lock2Solved') &&
           isValidFlagFlip('lock3Solved') &&

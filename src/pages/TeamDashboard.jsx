@@ -63,8 +63,12 @@ export default function TeamDashboard() {
     try {
       await setTeamDisqualified(teamId, true);
       showToast('You left the escape room screen — your team has been disqualified.', 'error');
-    } catch {
-      // best-effort; if this fails the team simply isn't disqualified
+    } catch (err) {
+      // Best-effort — but log it. A silent failure here (e.g. a Firestore
+      // rules rejection) means the whole anti-cheat feature does nothing
+      // while looking like it's working, which is exactly the kind of bug
+      // that's invisible until someone actually tests it live.
+      console.error('Failed to record lockdown violation:', err);
     }
   }, [teamId, showToast]);
 
