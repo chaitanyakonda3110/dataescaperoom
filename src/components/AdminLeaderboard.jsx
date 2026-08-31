@@ -1,7 +1,7 @@
 import { EVENT_CONFIG } from '../config/eventConfig';
 import { solvedCount } from '../utils/teamProgress';
 import { rankTeams, lastSolvedAt } from '../utils/leaderboard';
-import { formatDateTime } from '../utils/format';
+import { formatDateTimeWithSeconds } from '../utils/format';
 import { downloadCsv } from '../utils/csv';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -101,7 +101,7 @@ export default function AdminLeaderboard({ teams, onViewResults }) {
                   <td className="mono">
                     {solved} / {EVENT_CONFIG.totalLocks}
                   </td>
-                  <td>{formatDateTime(reachedAt)}</td>
+                  <td className="mono">{formatDateTimeWithSeconds(reachedAt)}</td>
                   <td>
                     <span
                       className={`status-pill ${

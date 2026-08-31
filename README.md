@@ -101,6 +101,8 @@ Clicking **FINISH GAME** (with confirmation, since it affects every team at once
 
 Ranking is: more Locks solved ranks higher; disqualified teams always rank last regardless of progress. When two or more teams are tied on Locks solved, whichever team reached that count **first** (the earliest timestamp among their solved Locks) ranks above the others — the "fastest response wins a tie" rule. That timestamp is recorded server-side the moment a Lock is correctly solved (`lockXSolvedAt`), and the Firestore rules only allow it to be set once, to the server's own request time — never a value a participant supplies — so a team can't fake having solved something earlier than they actually did.
 
+The tiebreak itself always compares full millisecond-precision timestamps — over a long event, two teams landing in the exact same minute is entirely possible, so the on-screen **REACHED AT** column shows down to the second, not just hour:minute. This is purely a display fix (the ranking was never actually only minute-precision under the hood) — it just makes a close ranking visibly trustworthy instead of looking like an arbitrary coin flip. The CSV export already had full timestamp precision (ISO format with milliseconds) from the start.
+
 **DOWNLOAD CSV** exports the full ranked results (rank, Team ID, team name, all 3 member names, Locks solved, when they reached that count, status) as a spreadsheet — useful for a permanent record independent of Firebase.
 
 ### When the timer runs out (naturally or via FINISH GAME)
@@ -168,6 +170,8 @@ public/assets/locks/lock{N}.png
 ```
 
 For example, Lock 3's image goes at `public/assets/locks/lock3.png`. It's shown at the top of that Lock's popup, above the answer field. If no file exists at that path, nothing is shown — no broken-image icon. Like the hints/password above, this needs a rebuild + redeploy to update on the live site (a local `npm run dev` picks up a new/changed file immediately).
+
+Tapping the image opens it in a zoomed-in overlay (`🔍 TAP TO ZOOM`) — useful for dense charts/screenshots. This is a custom in-app lightbox, not the browser's native pinch/ctrl-scroll zoom, specifically so it works identically whether or not the participant is using the Fullscreen toggle.
 
 ---
 
