@@ -1,0 +1,173 @@
+rules_version = '2';
+
+// =========================================================
+// FIRESTORE SECURITY RULES — Data Escape Room
+//
+// Deploy this file from the Firebase Console:
+//   Firestore Database -> Rules -> paste this file -> Publish
+// or via the Firebase CLI:
+//   firebase deploy --only firestore:rules
+//
+// Model:
+// - Admins authenticate with Firebase Auth (email/password) and get
+//   full read/write access to everything.
+// - Participants never sign in. They are identified only by knowing
+//   their Team ID (effectively a bearer token). Because of that, these
+//   rules can only validate the SHAPE of a participant write, not who
+//   is making it — anyone who knows a Team ID could in theory update
+//   that team's progress. This is a known, documented limitation for
+//   a short, supervised, single-event prototype. See README.md.
+// - Lock hints/passwords are NOT stored in Firestore at all — they live in
+//   src/config/locks.js, bundled straight into the app's JavaScript. There
+//   is no `locks` collection here to secure.
+// =========================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    match /teams/{teamId} {
+      allow read: if true;
+
+      // Registration: only allows creating a brand-new team document
+      // with all lock/hint flags unset.
+      allow create: if
+        request.resource.data.teamId == teamId &&
+        request.resource.data.teamName is string && request.resource.data.teamName.size() > 0 &&
+        request.resource.data.teamNameLower is string &&
+        request.resource.data.member1 is string && request.resource.data.member1.size() > 0 &&
+        request.resource.data.member2 is string && request.resource.data.member2.size() > 0 &&
+        request.resource.data.member3 is string && request.resource.data.member3.size() > 0 &&
+        request.resource.data.hintPenaltySeconds == 0 &&
+        request.resource.data.lock1Solved == false &&
+        request.resource.data.lock2Solved == false &&
+        request.resource.data.lock3Solved == false &&
+        request.resource.data.lock4Solved == false &&
+        request.resource.data.lock5Solved == false &&
+        request.resource.data.lock1SolvedAt == null &&
+        request.resource.data.lock2SolvedAt == null &&
+        request.resource.data.lock3SolvedAt == null &&
+        request.resource.data.lock4SolvedAt == null &&
+        request.resource.data.lock5SolvedAt == null &&
+        request.resource.data.lock1Hint1Used == false &&
+        request.resource.data.lock1Hint2Used == false &&
+        request.resource.data.lock2Hint1Used == false &&
+        request.resource.data.lock2Hint2Used == false &&
+        request.resource.data.lock3Hint1Used == false &&
+        request.resource.data.lock3Hint2Used == false &&
+        request.resource.data.lock4Hint1Used == false &&
+        request.resource.data.lock4Hint2Used == false &&
+        request.resource.data.lock5Hint1Used == false &&
+        request.resource.data.lock5Hint2Used == false;
+
+      // Admins can update/reset anything. Participants may only flip
+      // their own lock/hint flags from false -> true (never backwards),
+      // and may never touch registration fields.
+      allow update: if isAdmin() || isValidParticipantProgressUpdate();
+
+      allow delete: if isAdmin();
+
+      function unchangedField(field) {
+        return !(field in request.resource.data.diff(resource.data).affectedKeys()) ||
+          request.resource.data[field] == resource.data[field];
+      }
+
+      function isValidFlagFlip(field) {
+        return !(field in request.resource.data.diff(resource.data).affectedKeys()) ||
+          (resource.data[field] == false && request.resource.data[field] == true);
+      }
+
+      // Used for the leaderboard's fastest-response tiebreaker: a
+      // lockXSolvedAt field can only move from null to a value, and that
+      // value must be exactly the server's own time for this request —
+      // never a client-supplied timestamp — so a team can't claim to have
+      // solved something earlier than they actually did to win a tiebreak.
+      function isValidSolvedAtSet(field) {
+        return !(field in request.resource.data.diff(resource.data).affectedKeys()) ||
+          (resource.data.get(field, null) == null && request.resource.data[field] == request.time);
+      }
+
+      // hintPenaltySeconds is only ever allowed to increase (a team can
+      // never claw back time it already spent on a hint). The exact
+      // per-hint cost (5 minutes today) is enforced by the app's own
+      // useHint() call, not re-validated here field-by-field.
+      function isValidPenaltyChange() {
+        return !('hintPenaltySeconds' in request.resource.data.diff(resource.data).affectedKeys()) ||
+          request.resource.data.hintPenaltySeconds > resource.data.get('hintPenaltySeconds', 0);
+      }
+
+      // Mirrors the app's own computeTeamRemainingSeconds() logic: the
+      // shared timer must be RUNNING and THIS team's own countdown — the
+      // shared clock minus whatever hint penalty they've already used —
+      // must not have reached zero yet. This blocks lock/hint submissions
+      // before the admin starts the timer, while it's paused, and after
+      // a team's own effective time is up — enforced here so it can't be
+      // bypassed by calling Firestore directly instead of going through
+      // the UI.
+      function isTimerAcceptingSubmissions() {
+        let g = get(/databases/$(database)/documents/gameState/main).data;
+        let penalty = resource.data.get('hintPenaltySeconds', 0);
+        return g.status == 'RUNNING' &&
+          g.startedAt != null &&
+          (request.time.toMillis() - g.startedAt.toMillis()) < ((g.remainingSeconds - penalty) * 1000);
+      }
+
+      function isValidParticipantProgressUpdate() {
+        return
+          resource.data.get('disqualified', false) != true &&
+          isTimerAcceptingSubmissions() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'lock1Solved','lock2Solved','lock3Solved','lock4Solved','lock5Solved',
+            'lock1SolvedAt','lock2SolvedAt','lock3SolvedAt','lock4SolvedAt','lock5SolvedAt',
+            'lock1Hint1Used','lock1Hint2Used',
+            'lock2Hint1Used','lock2Hint2Used',
+            'lock3Hint1Used','lock3Hint2Used',
+            'lock4Hint1Used','lock4Hint2Used',
+            'lock5Hint1Used','lock5Hint2Used',
+            'hintPenaltySeconds','lastUpdated'
+          ]) &&
+          unchangedField('teamId') &&
+          unchangedField('teamName') &&
+          unchangedField('teamNameLower') &&
+          unchangedField('member1') &&
+          unchangedField('member2') &&
+          unchangedField('member3') &&
+          unchangedField('registeredAt') &&
+          isValidPenaltyChange() &&
+          isValidFlagFlip('lock1Solved') &&
+          isValidFlagFlip('lock2Solved') &&
+          isValidFlagFlip('lock3Solved') &&
+          isValidFlagFlip('lock4Solved') &&
+          isValidFlagFlip('lock5Solved') &&
+          isValidSolvedAtSet('lock1SolvedAt') &&
+          isValidSolvedAtSet('lock2SolvedAt') &&
+          isValidSolvedAtSet('lock3SolvedAt') &&
+          isValidSolvedAtSet('lock4SolvedAt') &&
+          isValidSolvedAtSet('lock5SolvedAt') &&
+          isValidFlagFlip('lock1Hint1Used') &&
+          isValidFlagFlip('lock1Hint2Used') &&
+          isValidFlagFlip('lock2Hint1Used') &&
+          isValidFlagFlip('lock2Hint2Used') &&
+          isValidFlagFlip('lock3Hint1Used') &&
+          isValidFlagFlip('lock3Hint2Used') &&
+          isValidFlagFlip('lock4Hint1Used') &&
+          isValidFlagFlip('lock4Hint2Used') &&
+          isValidFlagFlip('lock5Hint1Used') &&
+          isValidFlagFlip('lock5Hint2Used');
+      }
+    }
+
+    match /gameState/{stateId} {
+      // Everyone needs to read the timer; only admins control it.
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

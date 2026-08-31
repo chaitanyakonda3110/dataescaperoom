@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.env.local
+.DS_Store
+*.log
+.firebase
+
+# Real event answers stay local-only — never committed. See
+# src/config/locks.example.js for the template, and README.md section 4
+# for how the GitHub Actions deploy reconstructs the real file from a
+# repository secret at build time.
+src/config/locks.js
