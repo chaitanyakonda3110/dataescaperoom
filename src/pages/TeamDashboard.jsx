@@ -175,6 +175,7 @@ export default function TeamDashboard() {
           lockData={LOCKS[`lock${openLockIndex}`]}
           team={team}
           teamId={teamId}
+          gameState={gameState}
           onClose={() => setOpenLockIndex(null)}
         />
       )}

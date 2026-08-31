@@ -2,6 +2,14 @@ import { formatDateTime, formatTime } from '../utils/format';
 import { EVENT_CONFIG } from '../config/eventConfig';
 import { solvedCount } from '../utils/teamProgress';
 import { computeTeamRemainingSeconds } from '../utils/timerMath';
+import { getTeamStatus, TEAM_STATUS_LABEL } from '../utils/teamStatus';
+
+const STATUS_PILL_CLASS = {
+  DISQUALIFIED: 'status-pill--disqualified',
+  COMPLETED: 'status-pill--complete',
+  TIME_UP: 'status-pill--time-up',
+  ACTIVE: 'status-pill--active',
+};
 
 export default function AdminTeamTable({ teams, gameState, onSelectTeam }) {
   if (teams.length === 0) {
@@ -29,8 +37,8 @@ export default function AdminTeamTable({ teams, gameState, onSelectTeam }) {
         <tbody>
           {sorted.map((team) => {
             const solved = solvedCount(team);
-            const completed = solved === EVENT_CONFIG.totalLocks;
             const teamRemaining = computeTeamRemainingSeconds(gameState, team);
+            const status = getTeamStatus(team, gameState);
             return (
               <tr
                 key={team.teamId}
@@ -56,19 +64,13 @@ export default function AdminTeamTable({ teams, gameState, onSelectTeam }) {
                   </div>
                 </td>
                 <td>
-                  <span
-                    className={`status-pill ${
-                      team.disqualified
-                        ? 'status-pill--disqualified'
-                        : completed
-                        ? 'status-pill--complete'
-                        : 'status-pill--active'
-                    }`}
-                  >
-                    {team.disqualified ? 'DISQUALIFIED' : completed ? 'COMPLETED' : 'ACTIVE'}
+                  <span className={`status-pill ${STATUS_PILL_CLASS[status]}`}>
+                    {TEAM_STATUS_LABEL[status]}
                   </span>
                 </td>
-                <td className="mono">{formatTime(teamRemaining)}</td>
+                <td className="mono">
+                  {status === 'TIME_UP' ? "TIME'S UP" : formatTime(teamRemaining)}
+                </td>
                 <td>{formatDateTime(team.registeredAt)}</td>
               </tr>
             );

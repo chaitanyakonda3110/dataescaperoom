@@ -589,6 +589,36 @@ input {
   margin: 0 0 12px;
 }
 
+.lock-modal__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 32px; /* clear the × close button */
+  margin-bottom: 12px;
+}
+
+.lock-modal__title {
+  margin-bottom: 0;
+}
+
+.lock-modal__timer {
+  flex-shrink: 0;
+  font-family: 'Space Grotesk', monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--lavender);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
+.lock-modal__timer--up {
+  color: var(--danger);
+  border-color: rgba(251, 113, 133, 0.5);
+}
+
 .modal-card__desc {
   color: var(--muted);
   font-size: 0.9rem;
@@ -1463,6 +1493,11 @@ input {
 .status-pill--disqualified {
   color: var(--danger);
   border: 1px solid rgba(251, 113, 133, 0.5);
+}
+
+.status-pill--time-up {
+  color: var(--warning);
+  border: 1px solid rgba(251, 191, 36, 0.5);
 }
 
 .admin-table__row--disqualified {

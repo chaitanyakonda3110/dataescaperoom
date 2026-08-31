@@ -1,16 +1,32 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { markLockSolved, useHint } from '../firebase/firestore';
 import { EVENT_CONFIG } from '../config/eventConfig';
+import { computeTeamRemainingSeconds } from '../utils/timerMath';
+import { formatTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
 import ConfirmModal from './ConfirmModal';
 import LockImage from './LockImage';
 
-export default function LockModal({ lockIndex, lockData, team, teamId, onClose }) {
+export default function LockModal({ lockIndex, lockData, team, teamId, gameState, onClose }) {
   const [value, setValue] = useState('');
   const [invalid, setInvalid] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [pendingHint, setPendingHint] = useState(null); // 1 | 2 | null
+  const [, setTick] = useState(0);
   const { showToast } = useToast();
+
+  // The dashboard's own Timer is hidden behind this popup while it's open,
+  // so show a compact live countdown right in the header instead — same
+  // server-anchored calculation, just re-rendered every second locally to
+  // animate it.
+  useEffect(() => {
+    if (gameState?.status !== 'RUNNING') return undefined;
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [gameState?.status]);
+
+  const remaining = computeTeamRemainingSeconds(gameState, team);
+  const isTimeUp = gameState?.status === 'RUNNING' && remaining <= 0;
 
   const lockKey = `lock${lockIndex}`;
   const hint1Used = !!team?.[`${lockKey}Hint1Used`];
@@ -53,7 +69,12 @@ export default function LockModal({ lockIndex, lockData, team, teamId, onClose }
           ×
         </button>
 
-        <h3 className="modal-card__title">LOCK {lockIndex}</h3>
+        <div className="lock-modal__header-row">
+          <h3 className="modal-card__title lock-modal__title">LOCK {lockIndex}</h3>
+          <span className={`lock-modal__timer ${isTimeUp ? 'lock-modal__timer--up' : ''}`}>
+            ⏱ {isTimeUp ? "TIME'S UP" : formatTime(remaining)}
+          </span>
+        </div>
 
         <LockImage lockIndex={lockIndex} />
 

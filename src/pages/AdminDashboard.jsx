@@ -4,10 +4,12 @@ import {
   subscribeToGameState,
   ensureGameStateExists,
   resetAllTeamsProgress,
+  finishGameNow,
 } from '../firebase/firestore';
 import { adminSignOut } from '../firebase/auth';
 import { deriveDisplayStatus } from '../utils/timerMath';
 import { isTeamComplete } from '../utils/teamProgress';
+import { getTeamStatus } from '../utils/teamStatus';
 import { EVENT_CONFIG } from '../config/eventConfig';
 import AdminStats from '../components/AdminStats';
 import AdminTimerControl from '../components/AdminTimerControl';
@@ -30,6 +32,7 @@ export default function AdminDashboard() {
   const { showToast } = useToast();
   const knownCompletedIds = useRef(null); // null = not yet initialized
   const wasTimeUp = useRef(false);
+  const autoFinished = useRef(false);
 
   useEffect(() => {
     ensureGameStateExists();
@@ -76,6 +79,29 @@ export default function AdminDashboard() {
     wasTimeUp.current = isTimeUp;
   }, [gameState]);
 
+  // If every registered team has already reached a terminal state (time up,
+  // disqualified, or completed) while the event is still RUNNING, there's
+  // no one left who could still submit a Lock — end it automatically so the
+  // results popup appears without the admin needing to notice and hit
+  // FINISH GAME manually. Re-arms whenever the timer is reset for a fresh
+  // round (NOT_STARTED), so this can fire again next time.
+  useEffect(() => {
+    if (!gameState) return;
+    if (gameState.status === 'NOT_STARTED') {
+      autoFinished.current = false;
+      return;
+    }
+    if (gameState.status !== 'RUNNING' || teams === null || teams.length === 0) return;
+
+    const allTeamsDone = teams.every((team) => getTeamStatus(team, gameState) !== 'ACTIVE');
+    if (allTeamsDone && !autoFinished.current) {
+      autoFinished.current = true;
+      finishGameNow().catch(() => {
+        autoFinished.current = false; // allow a retry on the next snapshot if this write failed
+      });
+    }
+  }, [teams, gameState]);
+
   if (teams === null) {
     return <LoadingScreen message="Loading admin control center..." />;
   }
@@ -116,7 +142,11 @@ export default function AdminDashboard() {
 
         <Timer gameState={gameState} />
 
-        <AdminLeaderboard teams={teams} onViewResults={() => setResultsModal('podium')} />
+        <AdminLeaderboard
+          teams={teams}
+          gameState={gameState}
+          onViewResults={() => setResultsModal('podium')}
+        />
 
         <div className="admin-panel">
           <div className="admin-panel__header">

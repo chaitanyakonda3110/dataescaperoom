@@ -59,6 +59,7 @@ data-escape-room/
 │   │   ├── format.js
 │   │   ├── timerMath.js
 │   │   ├── teamProgress.js
+│   │   ├── teamStatus.js
 │   │   ├── leaderboard.js
 │   │   └── csv.js
 │   ├── App.jsx
@@ -80,8 +81,9 @@ All source code is already written and functional — this is not a mockup. You 
 
 - **`/`** — Registration screen. A team registers with a team name + 3 members and gets a unique **Team ID**. If a team ID is already stored in the browser (`localStorage`, used only as a convenience pointer, not as the database), returning visitors skip straight to "Welcome back."
 - **`/team/:teamId`** — Team dashboard: synced countdown timer, progress bar, and 5 Lock tiles. All state lives in Firestore, so a refresh never loses progress.
-  - Tapping an unsolved Lock opens a popup showing that Lock's question image (if one exists), a single answer field, an **UNLOCK** button, and two **Hint** buttons. Using a hint permanently reveals that hint's text and deducts minutes from **that team's own time only** — see the timer note below.
+  - Tapping an unsolved Lock opens a popup showing that Lock's question image (if one exists), a single answer field, an **UNLOCK** button, and two **Hint** buttons. Using a hint permanently reveals that hint's text and deducts minutes from **that team's own time only** — see the timer note below. The popup also shows a compact live countdown next to the "LOCK N" title, since it covers the dashboard's own timer while open.
   - Locks can only be opened/submitted while the admin has the shared timer actively `RUNNING` and this team's own effective time hasn't run out — locked before it starts, while paused, and once their time is up.
+  - A team's status (shown in the admin team table and leaderboard) is one of `ACTIVE`, `COMPLETED`, `TIME UP` (their own effective time ran out without finishing), or `DISQUALIFIED` — computed the same way in both places from a single shared function, so they can never disagree.
   - Solving all 5 Locks replaces the dashboard with a congratulations screen instead of the ticking timer.
   - While the timer is running, switching to another tab or window auto-disqualifies the team after a short grace period — see section 10 below.
 - **`/admin`** — Shows an admin login form until a Firebase-authenticated admin signs in, then swaps to the full Admin Control Center, top to bottom:
@@ -96,6 +98,8 @@ All source code is already written and functional — this is not a mockup. You 
 ### FINISH GAME — ending the event early
 
 Clicking **FINISH GAME** (with confirmation, since it affects every team at once and can't be undone) instantly sets every team's remaining time to zero, exactly as if the clock had actually run out. Every Lock closes immediately across all teams, and the "TIME'S UP" results popup appears on the admin dashboard, same as a natural expiry.
+
+This also happens **automatically**, with no admin click needed: if every registered team reaches a terminal state — `TIME UP`, `DISQUALIFIED`, or `COMPLETED` — while the event is still running, there's no one left who could possibly submit another Lock, so the admin dashboard ends the event itself and the results popup appears on its own. It re-arms the next time the timer is reset for a fresh round.
 
 ### The leaderboard — how ties get broken
 

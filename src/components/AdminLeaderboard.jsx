@@ -3,10 +3,18 @@ import { solvedCount } from '../utils/teamProgress';
 import { rankTeams, lastSolvedAt } from '../utils/leaderboard';
 import { formatDateTimeWithSeconds } from '../utils/format';
 import { downloadCsv } from '../utils/csv';
+import { getTeamStatus, TEAM_STATUS_LABEL } from '../utils/teamStatus';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-function exportResultsCsv(rankedTeams) {
+const STATUS_PILL_CLASS = {
+  DISQUALIFIED: 'status-pill--disqualified',
+  COMPLETED: 'status-pill--complete',
+  TIME_UP: 'status-pill--time-up',
+  ACTIVE: 'status-pill--active',
+};
+
+function exportResultsCsv(rankedTeams, gameState) {
   const header = [
     'Rank',
     'Team ID',
@@ -31,13 +39,13 @@ function exportResultsCsv(rankedTeams) {
       solvedCount(team),
       EVENT_CONFIG.totalLocks,
       reachedMs ? new Date(reachedMs).toISOString() : '',
-      team.disqualified ? 'DISQUALIFIED' : 'ACTIVE',
+      TEAM_STATUS_LABEL[getTeamStatus(team, gameState)],
     ];
   });
   downloadCsv(`data-escape-room-results-${Date.now()}.csv`, [header, ...rows]);
 }
 
-export default function AdminLeaderboard({ teams, onViewResults }) {
+export default function AdminLeaderboard({ teams, gameState, onViewResults }) {
   if (teams.length === 0) {
     return (
       <div className="admin-panel">
@@ -66,7 +74,11 @@ export default function AdminLeaderboard({ teams, onViewResults }) {
               VIEW RESULTS
             </button>
           )}
-          <button type="button" className="btn btn--ghost" onClick={() => exportResultsCsv(ranked)}>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => exportResultsCsv(ranked, gameState)}
+          >
             DOWNLOAD CSV
           </button>
         </div>
@@ -88,6 +100,7 @@ export default function AdminLeaderboard({ teams, onViewResults }) {
             {ranked.map((team, i) => {
               const solved = solvedCount(team);
               const reachedAt = lastSolvedAt(team);
+              const status = getTeamStatus(team, gameState);
               return (
                 <tr
                   key={team.teamId}
@@ -103,12 +116,8 @@ export default function AdminLeaderboard({ teams, onViewResults }) {
                   </td>
                   <td className="mono">{formatDateTimeWithSeconds(reachedAt)}</td>
                   <td>
-                    <span
-                      className={`status-pill ${
-                        team.disqualified ? 'status-pill--disqualified' : 'status-pill--active'
-                      }`}
-                    >
-                      {team.disqualified ? 'DISQUALIFIED' : 'ACTIVE'}
+                    <span className={`status-pill ${STATUS_PILL_CLASS[status]}`}>
+                      {TEAM_STATUS_LABEL[status]}
                     </span>
                   </td>
                 </tr>
